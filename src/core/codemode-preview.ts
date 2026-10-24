@@ -12,13 +12,17 @@ const MAX_PENDING_PARENTS = 64;
 const MAX_PARENT_ID_BYTES = 4096;
 const MAX_PENDING_BYTES = 8 * MAX_PREVIEW_DETAILS_BYTES;
 
-function addOmissions(current: number, count: number): number {
-	return Math.min(Number.MAX_SAFE_INTEGER, current + count);
+function addOmissions(preview: ToolPreviewDetails, count: number): void {
+	if (count > Number.MAX_SAFE_INTEGER - preview.omittedChanges) preview.incomplete = true;
+	preview.omittedChanges = Math.min(Number.MAX_SAFE_INTEGER, preview.omittedChanges + count);
 }
 
-// Reserve counter growth so reporting omissions cannot exceed the serialization budget.
+// Reserve flag and counter growth so reporting truncation stays inside the serialization budget.
 function retainedBytes(preview: ToolPreviewDetails): number {
-	return Buffer.byteLength(JSON.stringify({ ...preview, omittedChanges: Number.MAX_SAFE_INTEGER }), "utf8");
+	return Buffer.byteLength(
+		JSON.stringify({ ...preview, omittedChanges: Number.MAX_SAFE_INTEGER, incomplete: true }),
+		"utf8",
+	);
 }
 
 export function registerCodemodePreviews(
@@ -48,7 +52,9 @@ export function registerCodemodePreviews(
 			// without retaining an unbounded second map of discarded parent identifiers.
 			const preview =
 				collected?.preview ??
-				(trackingOverflowed ? { version: 1 as const, changes: [], omittedChanges: 1 } : undefined);
+				(trackingOverflowed
+					? { version: 1 as const, changes: [], omittedChanges: 0, incomplete: true as const }
+					: undefined);
 			if (!preview) return;
 			return { details: { ...(isRecord(event.details) ? event.details : {}), piDiff: preview } };
 		}
@@ -61,7 +67,7 @@ export function registerCodemodePreviews(
 		)
 			return;
 		const incoming = readToolPreview(event.toolName, event.details, event.input);
-		if (!incoming || (incoming.changes.length === 0 && incoming.omittedChanges === 0)) return;
+		if (!incoming || (incoming.changes.length === 0 && incoming.omittedChanges === 0 && !incoming.incomplete)) return;
 
 		const parentId = event.parentToolCallId;
 		let parent = pending.get(parentId);
@@ -73,23 +79,25 @@ export function registerCodemodePreviews(
 			const preview: ToolPreviewDetails = {
 				version: 1,
 				changes: [],
-				omittedChanges: trackingOverflowed ? 1 : 0,
+				omittedChanges: 0,
+				...(trackingOverflowed ? { incomplete: true as const } : {}),
 			};
 			parent = { preview, bytes: retainedBytes(preview) };
 			pending.set(parentId, parent);
 			pendingBytes += parent.bytes;
 		}
 
-		parent.preview.omittedChanges = addOmissions(parent.preview.omittedChanges, incoming.omittedChanges);
+		if (incoming.incomplete) parent.preview.incomplete = true;
+		addOmissions(parent.preview, incoming.omittedChanges);
 		for (const change of incoming.changes) {
 			if (parent.preview.changes.length >= MAX_PREVIEW_CHANGES) {
-				parent.preview.omittedChanges = addOmissions(parent.preview.omittedChanges, 1);
+				addOmissions(parent.preview, 1);
 				continue;
 			}
 			const candidate: ToolPreviewDetails = { ...parent.preview, changes: [...parent.preview.changes, change] };
 			const bytes = retainedBytes(candidate);
 			if (bytes > MAX_PREVIEW_DETAILS_BYTES || pendingBytes - parent.bytes + bytes > MAX_PENDING_BYTES) {
-				parent.preview.omittedChanges = addOmissions(parent.preview.omittedChanges, 1);
+				addOmissions(parent.preview, 1);
 				continue;
 			}
 			pendingBytes += bytes - parent.bytes;

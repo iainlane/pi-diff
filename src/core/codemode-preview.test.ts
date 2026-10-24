@@ -280,14 +280,16 @@ describe("codemode preview persistence", () => {
 		expect(saved(events.result(result({ toolCallId: "999" })))).toStrictEqual({
 			version: 1,
 			changes: [],
-			omittedChanges: 1,
+			omittedChanges: 0,
+			incomplete: true,
 		});
 		events.result(result({ toolCallId: "0" }));
 		events.result(write("999", "later"));
 		expect(saved(events.result(result({ toolCallId: "999" })))).toStrictEqual({
 			version: 1,
 			changes: [{ kind: "new", filePath: "later", content: "new", omittedLines: 0 }],
-			omittedChanges: 1,
+			omittedChanges: 0,
+			incomplete: true,
 		});
 		events.lifecycle("session_start");
 		expect(events.result(result({ toolCallId: "999" }))).toBeUndefined();
@@ -300,7 +302,36 @@ describe("codemode preview persistence", () => {
 		expect(saved(events.result(result({ toolCallId: id })))).toStrictEqual({
 			version: 1,
 			changes: [],
-			omittedChanges: 1,
+			omittedChanges: 0,
+			incomplete: true,
+		});
+	});
+
+	it.each([false, true])("propagates incomplete child capture with operations=%s", (withOperations) => {
+		const events = harness();
+		const piDiff = {
+			...writePreviewDetails("a.txt", null, "new"),
+			...(withOperations ? {} : { changes: [] }),
+			omittedChanges: 2,
+			incomplete: true as const,
+		};
+		events.result({ ...write(), details: { piDiff } });
+		const response = events.result(result({ details: { output: "kept", metadata: { native: true } } }));
+		expect(response).toStrictEqual({ details: { output: "kept", metadata: { native: true }, piDiff } });
+		expect(saved(JSON.parse(JSON.stringify(response)))).toStrictEqual(piDiff);
+	});
+
+	it("retains incomplete-only capture without inventing omitted operation counts", () => {
+		const events = harness();
+		events.result({
+			...write(),
+			details: { piDiff: { version: 1, changes: [], omittedChanges: 0, incomplete: true } },
+		});
+		expect(saved(events.result(result()))).toStrictEqual({
+			version: 1,
+			changes: [],
+			omittedChanges: 0,
+			incomplete: true,
 		});
 	});
 
@@ -324,6 +355,7 @@ describe("codemode preview persistence", () => {
 			version: 1,
 			changes: [],
 			omittedChanges: Number.MAX_SAFE_INTEGER,
+			incomplete: true,
 		});
 	});
 });
