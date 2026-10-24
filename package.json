@@ -26,6 +26,7 @@
 	},
 	"files": [
 		"dist/",
+		"src/",
 		"media/",
 		"README.md",
 		"LICENSE"
@@ -61,7 +62,7 @@
 	},
 	"pi": {
 		"extensions": [
-			"./dist/index.js"
+			"./src/index.ts"
 		]
 	},
 	"main": "./dist/index.js",

@@ -46,7 +46,7 @@ Or load directly for development:
 pi -e ./src/index.ts
 ```
 
-Use the source entry point for a checkout. Loading compiled files beside a locally installed SDK can bypass Pi's host import aliases and create a separate mutation queue.
+The package and checkout both load the TypeScript entry point through Pi. This preserves the host SDK instance and file mutation queue, including when another SDK installation is present beside the extension. Compiled output remains available for library imports.
 
 ## How It Works
 
