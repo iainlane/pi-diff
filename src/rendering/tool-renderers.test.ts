@@ -163,6 +163,35 @@ describe("native tool renderers", () => {
 		expect(result).toEqual(before);
 	});
 
+	it.each([
+		{
+			_type: "diff",
+			filePath: "saved.ts",
+			diff: parseDiff("old();\n", "new();\n"),
+			oldContent: "old();\n",
+			newContent: "new();\n",
+		},
+		{ _type: "new", filePath: "saved.ts", content: "new();\n", lines: 2 },
+	])("expands historical JSON write previews: $_type", async (details) => {
+		const result = {
+			content: [{ type: "text" as const, text: "Successfully wrote to saved.ts" }],
+			details: JSON.parse(JSON.stringify(details)),
+		};
+		const before = structuredClone(result);
+		const component = createToolRenderers("write").renderResult?.(
+			result,
+			{ ...options, expanded: true },
+			theme,
+			context({ args: { path: "saved.ts", content: "current content must not replace saved content" } }),
+		) as Component;
+		const output = (await settled(component)).join("\n");
+		expect(output).toContain("saved.ts");
+		expect(output).toContain("new();");
+		if (details._type === "diff") expect(output).toContain("old();");
+		expect(output).not.toContain("current content");
+		expect(result).toStrictEqual(before);
+	});
+
 	it("honors the context error flag and preserves fallback native output", () => {
 		const renderers = createToolRenderers("write");
 		const result = { content: [{ type: "text" as const, text: "native diagnostic" }], details: undefined };

@@ -1,5 +1,6 @@
 import { createTwoFilesPatch } from "diff";
 import { describe, expect, it } from "vitest";
+import { parseDiff } from "./diff.js";
 import { MAX_PREVIEW_BYTES, readPreviewDetails, readToolPreview, writePreviewDetails } from "./tool-preview.js";
 
 describe("native tool previews", () => {
@@ -52,6 +53,88 @@ describe("native tool previews", () => {
 			version: 1,
 			changes: [{ kind: "new", filePath: "a.ts", content: "const value = 1;\n", omittedLines: 0 }],
 			omittedChanges: 0,
+		});
+	});
+
+	it.each([
+		{
+			details: {
+				_type: "diff",
+				filePath: "saved.ts",
+				diff: parseDiff("old();\n", "new();\n"),
+				oldContent: "old();\n",
+				newContent: "new();\n",
+			},
+			expected: {
+				kind: "diff",
+				filePath: "saved.ts",
+				diff: {
+					lines: [
+						{
+							type: "sep",
+							content: "",
+							oldNum: null,
+							newNum: null,
+							hunkMeta: { oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, context: undefined },
+						},
+						{ type: "del", content: "old();", oldNum: 1, newNum: null },
+						{ type: "add", content: "new();", oldNum: null, newNum: 1 },
+					],
+					added: 1,
+					removed: 1,
+					chars: 14,
+				},
+				omittedLines: 0,
+			},
+		},
+		{
+			details: { _type: "new", filePath: "saved.ts", content: "created();\n", lines: 2 },
+			expected: { kind: "new", filePath: "saved.ts", content: "created();\n", omittedLines: 0 },
+		},
+		{
+			details: { _type: "noChange" },
+			expected: { kind: "unchanged", filePath: "saved.ts" },
+		},
+	])("reads historical write details without changing stored data: $details._type", ({ details, expected }) => {
+		const saved = JSON.parse(JSON.stringify(details));
+		const before = structuredClone(saved);
+		expect(readToolPreview("write", saved, { path: "saved.ts" })).toStrictEqual({
+			version: 1,
+			changes: [expected],
+			omittedChanges: 0,
+		});
+		expect(saved).toStrictEqual(before);
+	});
+
+	it.each([
+		{
+			_type: "diff",
+			filePath: "saved.ts",
+			diff: { lines: [{ type: "add", oldNum: null, newNum: 1, content: 42 }], added: 1, removed: 0, chars: 1 },
+		},
+		{ _type: "new", filePath: "saved.ts", content: 42 },
+		{ _type: "diff", diff: parseDiff("old", "new") },
+	])("rejects malformed historical write details: %j", (details) => {
+		expect(readToolPreview("write", details, { path: "saved.ts" })).toBeUndefined();
+	});
+
+	it.each([
+		{ _type: "new", filePath: "large.ts", content: "x".repeat(MAX_PREVIEW_BYTES + 1) },
+		{
+			_type: "diff",
+			filePath: "large.ts",
+			diff: {
+				lines: [{ type: "add", oldNum: null, newNum: 1, content: "x".repeat(MAX_PREVIEW_BYTES + 1) }],
+				added: 1,
+				removed: 0,
+				chars: MAX_PREVIEW_BYTES + 1,
+			},
+		},
+	])("bounds historical write previews: $_type", (details) => {
+		expect(readToolPreview("write", details, { path: "large.ts" })).toStrictEqual({
+			version: 1,
+			changes: [],
+			omittedChanges: 1,
 		});
 	});
 

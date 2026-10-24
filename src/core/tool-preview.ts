@@ -122,10 +122,26 @@ export function writePreviewDetails(filePath: string, oldContent: string | null,
 	return singlePreview({ kind: "diff", filePath, diff: parseDiff(oldContent, content, 3), omittedLines: 0 });
 }
 
+function readLegacyWritePreview(details: Record<string, unknown>, args: unknown): ToolPreviewDetails | undefined {
+	if (details._type === "noChange") {
+		if (!isRecord(args) || typeof args.path !== "string") return undefined;
+		return singlePreview({ kind: "unchanged", filePath: args.path });
+	}
+	if (details._type !== "diff" && details._type !== "new") return undefined;
+	const candidate =
+		details._type === "diff"
+			? { kind: "diff", filePath: details.filePath, diff: details.diff, omittedLines: 0 }
+			: { kind: "new", filePath: details.filePath, content: details.content, omittedLines: 0 };
+	if (serialisedBytes(candidate) > MAX_PREVIEW_BYTES) return omittedPreview();
+	const preview = readFilePreview(candidate);
+	return preview ? singlePreview(preview) : undefined;
+}
+
 export function readToolPreview(name: string, details: unknown, args: unknown): ToolPreviewDetails | undefined {
 	if (!isRecord(details)) return undefined;
 	const saved = readPreviewDetails(details.piDiff);
 	if (saved) return saved;
+	if (name === "write") return readLegacyWritePreview(details, args);
 	if (name !== "edit" || typeof details.patch !== "string" || !isRecord(args)) return undefined;
 	if (typeof args.path !== "string") return undefined;
 	if (Buffer.byteLength(details.patch, "utf8") > MAX_PREVIEW_BYTES) return omittedPreview();
