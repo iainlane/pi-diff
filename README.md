@@ -46,6 +46,8 @@ Or load directly for development:
 pi -e ./src/index.ts
 ```
 
+Use the source entry point for a checkout. Loading compiled files beside a locally installed SDK can bypass Pi's host import aliases and create a separate mutation queue.
+
 ## How It Works
 
 pi-diff uses Pi's [tool renderer API][tool-renderers] for presentation and native tool factories for execution. Native parameter schemas, prompt guidance, cancellation and file-mutation ordering remain in place.
@@ -301,9 +303,6 @@ npm test            # Run tests
 ```bash
 # From the pi-diff directory
 pi -e ./src/index.ts
-
-# Or install globally
-pi install .
 ```
 
 ## How pi Extensions Work
@@ -311,9 +310,13 @@ pi install .
 pi-diff is a **pi extension** — a TypeScript file that exports a default function receiving the pi API:
 
 ```typescript
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createToolRenderers } from "./rendering/tool-renderers.js";
+
 export default function piDiffExtension(pi: ExtensionAPI): void {
+  const edit = createToolRenderers("edit");
   pi.registerToolRenderer((toolName, next) => {
-    if (toolName === "edit") return createEditRenderers();
+    if (toolName === "edit") return edit;
     return next();
   });
 }
