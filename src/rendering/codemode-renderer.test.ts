@@ -100,6 +100,25 @@ function deferred() {
 afterEach(() => vi.mocked(hunkPreview.renderSplit).mockReset());
 
 describe("composed codemode renderer", () => {
+	it.each([
+		{ content: "", added: 0 },
+		{ content: "a", added: 1 },
+		{ content: "a\n", added: 1 },
+		{ content: "a\n\n", added: 2 },
+	])("counts actual additions in new-file summaries for $content", ({ content, added }) => {
+		const data: ToolPreviewDetails = {
+			version: 1,
+			changes: [{ kind: "new", filePath: "new.txt", content, omittedLines: 0 }],
+			omittedChanges: 0,
+		};
+		const component = renderer().renderResult?.(result(data), options, theme, context());
+		expect(
+			lines(component as Component)
+				.split("\n")
+				.map((line) => line.trim())
+				.filter(Boolean),
+		).toStrictEqual([`File changes: 1 file, 1 operation +${added} -0`, "ctrl+o to expand"]);
+	});
 	it("delegates unrelated tools and leaves unavailable/default base result rendering alone", () => {
 		const resolver = createCodemodeRendererResolver();
 		const base = baseRenderers();

@@ -10,6 +10,13 @@ export type FilePreview =
 	| { kind: "new"; filePath: string; content: string; omittedLines: number }
 	| { kind: "unchanged"; filePath: string };
 
+export function previewLines(content: string): string[] {
+	if (!content) return [];
+	const lines = content.split("\n");
+	if (lines.at(-1) === "") lines.pop();
+	return lines;
+}
+
 export interface ToolPreviewDetails {
 	version: 1;
 	changes: FilePreview[];

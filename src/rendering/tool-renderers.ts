@@ -2,7 +2,13 @@ import type { Theme, ToolRenderers, ToolRenderResultOptions } from "@earendil-wo
 import { type Component, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { COLLAPSED_EXPAND_LABEL } from "../collapsed-hint.js";
 import type { ParsedDiff } from "../core/diff.js";
-import { type FilePreview, isRecord, readToolPreview, type ToolPreviewDetails } from "../core/tool-preview.js";
+import {
+	type FilePreview,
+	isRecord,
+	previewLines,
+	readToolPreview,
+	type ToolPreviewDetails,
+} from "../core/tool-preview.js";
 import { lang, renderSplit, resolveDiffColors, themeCacheKey } from "../review/hunk-preview.js";
 
 export type ResultRenderContext = Parameters<NonNullable<ToolRenderers["renderResult"]>>[3];
@@ -84,7 +90,7 @@ function omitted(count: number, noun: string): string {
 }
 
 function newFileDiff(content: string): ParsedDiff {
-	const source = content ? content.split("\n") : [];
+	const source = previewLines(content);
 	return {
 		lines: source.map((line, index) => ({ type: "add", oldNum: null, newNum: index + 1, content: line })),
 		added: source.length,
@@ -97,8 +103,8 @@ function summary(change: FilePreview, theme: Theme): string {
 	const path = theme.fg("toolTitle", change.filePath);
 	if (change.kind === "unchanged") return `${path} ${theme.fg("muted", "unchanged")}`;
 	if (change.kind === "new") {
-		const count = change.content ? change.content.split("\n").length : 0;
-		return `${path} ${theme.fg("success", `new file (${count} lines)`)}`;
+		const count = previewLines(change.content).length;
+		return `${path} ${theme.fg("success", `new file (${count} ${count === 1 ? "line" : "lines"})`)}`;
 	}
 	return `${path} ${theme.fg("toolDiffAdded", `+${change.diff.added}`)} ${theme.fg("toolDiffRemoved", `-${change.diff.removed}`)}`;
 }

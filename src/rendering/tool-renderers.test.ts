@@ -63,6 +63,35 @@ function deferred() {
 afterEach(() => vi.mocked(hunkPreview.renderSplit).mockClear());
 
 describe("native tool renderers", () => {
+	it.each([
+		{ content: "", expected: [] },
+		{ content: "a", expected: ["a"] },
+		{ content: "a\n", expected: ["a"] },
+		{ content: "a\n\n", expected: ["a", ""] },
+	])("counts and renders actual new-file lines for $content", async ({ content, expected }) => {
+		const data: ToolPreviewDetails = {
+			version: 1,
+			changes: [{ kind: "new", filePath: "new.txt", content, omittedLines: 0 }],
+			omittedChanges: 0,
+		};
+		const component = renderPreviewChanges(data, { ...options, expanded: true }, theme, context());
+		const output = await settled(component);
+		expect(output[0].trimEnd()).toBe(
+			`new.txt new file (${expected.length} ${expected.length === 1 ? "line" : "lines"})`,
+		);
+		expect(vi.mocked(hunkPreview.renderSplit).mock.calls.map(([diff]) => diff)).toStrictEqual(
+			expected.length
+				? [
+						{
+							lines: expected.map((line, index) => ({ type: "add", oldNum: null, newNum: index + 1, content: line })),
+							added: expected.length,
+							removed: 0,
+							chars: content.length,
+						},
+					]
+				: [],
+		);
+	});
 	it.each(["edit", "write"] as const)("renders %s with the native default shell and path", (name) => {
 		const renderers = createToolRenderers(name);
 		expect(renderers.renderShell).toBe("default");

@@ -1,7 +1,13 @@
 import type { Theme, ToolRendererResolver } from "@earendil-works/pi-coding-agent";
 import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { COLLAPSED_EXPAND_LABEL } from "../collapsed-hint.js";
-import { type FilePreview, isRecord, readPreviewDetails, type ToolPreviewDetails } from "../core/tool-preview.js";
+import {
+	type FilePreview,
+	isRecord,
+	previewLines,
+	readPreviewDetails,
+	type ToolPreviewDetails,
+} from "../core/tool-preview.js";
 import { type ResultRenderContext, renderPreviewChanges } from "./tool-renderers.js";
 
 interface ResultSlot {
@@ -37,7 +43,7 @@ function compactSummary(previews: ToolPreviewDetails, theme: Theme): Component {
 			added += change.diff.added;
 			removed += change.diff.removed;
 		} else {
-			added += change.content ? change.content.split("\n").length : 0;
+			added += previewLines(change.content).length;
 		}
 	}
 	const summary = `${countLabel(files.size, "file")}, ${countLabel(previews.changes.length, "operation")}`;
