@@ -14,6 +14,7 @@ export interface ToolPreviewDetails {
 	version: 1;
 	changes: FilePreview[];
 	omittedChanges: number;
+	incomplete?: true;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,7 +50,9 @@ function readDiffLine(value: unknown): DiffLine | undefined {
 	if (typeof content !== "string") return undefined;
 	const hunkMeta = value.hunkMeta === undefined ? undefined : readHunkMeta(value.hunkMeta);
 	if (value.hunkMeta !== undefined && hunkMeta === undefined) return undefined;
-	return { type, oldNum, newNum, content, ...(hunkMeta ? { hunkMeta } : {}) };
+	const line: DiffLine = { type, oldNum, newNum, content };
+	if (hunkMeta) line.hunkMeta = hunkMeta;
+	return line;
 }
 
 function readDiff(value: unknown): ParsedDiff | undefined {
@@ -81,6 +84,7 @@ function readFilePreview(value: unknown): FilePreview | undefined {
 export function readPreviewDetails(value: unknown): ToolPreviewDetails | undefined {
 	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.changes)) return undefined;
 	if (!isCount(value.omittedChanges) || value.changes.length > MAX_PREVIEW_CHANGES) return undefined;
+	if (value.incomplete !== undefined && value.incomplete !== true) return undefined;
 	if (serialisedBytes(value) > MAX_PREVIEW_DETAILS_BYTES) return undefined;
 	const changes: FilePreview[] = [];
 	for (const item of value.changes) {
@@ -88,7 +92,9 @@ export function readPreviewDetails(value: unknown): ToolPreviewDetails | undefin
 		if (!change) return undefined;
 		changes.push(change);
 	}
-	return { version: 1, changes, omittedChanges: value.omittedChanges };
+	const details: ToolPreviewDetails = { version: 1, changes, omittedChanges: value.omittedChanges };
+	if (value.incomplete) details.incomplete = true;
+	return details;
 }
 
 function singlePreview(preview: FilePreview): ToolPreviewDetails {

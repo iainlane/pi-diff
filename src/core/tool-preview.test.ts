@@ -55,6 +55,11 @@ describe("native tool previews", () => {
 		});
 	});
 
+	it("preserves incomplete capture separately from known omission counts", () => {
+		const details = { version: 1, changes: [], omittedChanges: 0, incomplete: true };
+		expect(readPreviewDetails(JSON.parse(JSON.stringify(details)))).toStrictEqual(details);
+	});
+
 	it("reports oversized capture explicitly", () => {
 		expect(writePreviewDetails("large.txt", "old", "x".repeat(MAX_PREVIEW_BYTES + 1))).toStrictEqual({
 			version: 1,
