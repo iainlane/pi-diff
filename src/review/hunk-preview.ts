@@ -249,6 +249,12 @@ function createParsedDiffFromReviewHunk(hunk: ReviewHunk): ParsedDiff {
 	};
 }
 
+function terminalWidth(): number {
+	const columns =
+		process.stdout.columns || process.stderr.columns || Number.parseInt(process.env.COLUMNS ?? "", 10) || 200;
+	return Math.max(80, Math.min(columns - 4, 210));
+}
+
 function envInt(name: string, fallback: number): number {
 	const value = Number.parseInt(process.env[name] ?? "", 10);
 	return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -790,9 +796,9 @@ function plainWordDiff(oldText: string, newText: string): { old: string; new: st
 export async function renderUnified(
 	diff: ParsedDiff,
 	language: BundledLanguage | undefined,
-	maxLines: number,
-	colors: DiffColors,
-	width: number,
+	maxLines = 150,
+	colors: DiffColors = DEFAULT_DIFF_COLORS,
+	width = terminalWidth(),
 	options: DiffRenderOptions = {},
 ): Promise<string> {
 	if (!diff.lines.length) return "";
@@ -922,9 +928,9 @@ export async function renderUnified(
 export async function renderSplit(
 	diff: ParsedDiff,
 	language: BundledLanguage | undefined,
-	maxLines: number,
-	colors: DiffColors,
-	width: number,
+	maxLines = 60,
+	colors: DiffColors = DEFAULT_DIFF_COLORS,
+	width = terminalWidth(),
 	options: DiffRenderOptions = {},
 ): Promise<string> {
 	if (!shouldUseSplit(diff, width, maxLines, options))

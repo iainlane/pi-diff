@@ -84,6 +84,41 @@ it("exports the live parsing and rendering helpers", () => {
 	});
 });
 
+describe.each(["renderUnified", "renderSplit"] as const)("public %s defaults", (renderer) => {
+	it("renders changes with the original two-argument API", async () => {
+		const parsed = __testing.parseDiff("old();\n", "new();\n");
+		const output = stripTerminalSequences(await __testing[renderer](parsed, undefined));
+		expect({ removed: output.includes("old();"), added: output.includes("new();") }).toStrictEqual({
+			removed: true,
+			added: true,
+		});
+	});
+
+	it("accepts a line limit without a palette or width", async () => {
+		const parsed = __testing.parseDiff("old();\n", "new();\n");
+		const output = stripTerminalSequences(await __testing[renderer](parsed, undefined, 1));
+		expect({
+			removed: output.includes("old();"),
+			added: output.includes("new();"),
+			omitted: output.includes("more lines"),
+		}).toStrictEqual({
+			removed: false,
+			added: false,
+			omitted: true,
+		});
+	});
+
+	it("accepts an explicit palette without a width", async () => {
+		const parsed = __testing.parseDiff("old();\n", "new();\n");
+		const colors = { fgAdd: "\x1b[38;2;1;2;3m", fgDel: "\x1b[38;2;4;5;6m", fgCtx: "\x1b[38;2;7;8;9m" };
+		const output = await __testing[renderer](parsed, undefined, 10, colors);
+		expect({ removed: output.includes(colors.fgDel), added: output.includes(colors.fgAdd) }).toStrictEqual({
+			removed: true,
+			added: true,
+		});
+	});
+});
+
 describe("tool header formatting", () => {
 	it.each([
 		["write", "← write"],
