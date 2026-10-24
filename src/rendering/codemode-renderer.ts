@@ -31,6 +31,10 @@ function groupedChanges(previews: ToolPreviewDetails): ToolPreviewDetails {
 }
 
 function compactSummary(previews: ToolPreviewDetails, theme: Theme): Component {
+	if (previews.changes.length === 0 && previews.omittedChanges === 0 && previews.incomplete) {
+		return new Text(theme.fg("warning", "Preview capture incomplete"), 0, 0);
+	}
+
 	const files = new Set<string>();
 	let added = 0;
 	let removed = 0;

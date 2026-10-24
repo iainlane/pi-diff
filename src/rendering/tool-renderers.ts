@@ -11,7 +11,25 @@ import {
 } from "../core/tool-preview.js";
 import { lang, renderSplit, resolveDiffColors, themeCacheKey } from "../review/hunk-preview.js";
 
+type ToolRenderResult = Parameters<NonNullable<ToolRenderers["renderResult"]>>[0];
 export type ResultRenderContext = Parameters<NonNullable<ToolRenderers["renderResult"]>>[3];
+
+const ARROW_PREFIXED_TOOL_HEADERS = new Set(["write", "create", "edit"]);
+
+export function formatToolHeaderName(name: string): string {
+	return ARROW_PREFIXED_TOOL_HEADERS.has(name) ? `← ${name}` : name;
+}
+
+export function formatToolHeaderPath(theme: Pick<Theme, "fg">, filePath: string): string {
+	return theme.fg("toolTitle", filePath);
+}
+
+export function isToolResultError(
+	result: Partial<ToolRenderResult> & { isError?: boolean },
+	context: { isError?: boolean },
+): boolean {
+	return context.isError === true || result.isError === true;
+}
 type ComponentSlots = WeakMap<object, Map<string, PreviewText>>;
 
 class PreviewText extends Text {
@@ -89,6 +107,13 @@ function omitted(count: number, noun: string): string {
 	return `${count} ${noun}${count === 1 ? "" : "s"} omitted from capture`;
 }
 
+function captureNotices(previews: ToolPreviewDetails, theme: Theme): string[] {
+	const output: string[] = [];
+	if (previews.omittedChanges) output.push(theme.fg("muted", omitted(previews.omittedChanges, "change")));
+	if (previews.incomplete) output.push(theme.fg("warning", "Preview capture incomplete"));
+	return output;
+}
+
 function newFileDiff(content: string): ParsedDiff {
 	const source = previewLines(content);
 	return {
@@ -117,8 +142,7 @@ function summaryLines(previews: ToolPreviewDetails, theme: Theme, width: number)
 			output.push(theme.fg("muted", omitted(change.omittedLines, "line")));
 		}
 	}
-	if (previews.omittedChanges) output.push(theme.fg("muted", omitted(previews.omittedChanges, "change")));
-	if (previews.incomplete) output.push(theme.fg("warning", "Preview capture incomplete"));
+	output.push(...captureNotices(previews, theme));
 	return output;
 }
 
@@ -154,8 +178,7 @@ async function expandedChanges(
 			if (change.omittedLines) output.push(theme.fg("muted", omitted(change.omittedLines, "line")));
 		}
 	}
-	if (previews.omittedChanges) output.push(theme.fg("muted", omitted(previews.omittedChanges, "change")));
-	if (previews.incomplete) output.push(theme.fg("warning", "Preview capture incomplete"));
+	output.push(...captureNotices(previews, theme));
 	return output.join("\n");
 }
 
@@ -208,7 +231,7 @@ export function createToolRenderers(name: "edit" | "write"): ToolRenderers {
 		renderCall(args, theme, context) {
 			const component = componentFor(callSlots, context);
 			const path = isRecord(args) && typeof args.path === "string" ? args.path : "";
-			const title = `${theme.fg("toolTitle", theme.bold(`← ${name}`))} ${theme.fg("toolTitle", path)}`;
+			const title = `${theme.fg("toolTitle", theme.bold(formatToolHeaderName(name)))} ${formatToolHeaderPath(theme, path)}`;
 			component.setView(
 				JSON.stringify([title, themeCacheKey(theme)]),
 				(width) => fitLine(title, width),
@@ -218,16 +241,21 @@ export function createToolRenderers(name: "edit" | "write"): ToolRenderers {
 		},
 		renderResult(result, options, theme, context) {
 			const component = componentFor(resultSlots, context);
-			const isError = context.isError || (isRecord(result) && result.isError === true);
+			const isError = isToolResultError(result, context);
 			const nativeText = result.content
 				.filter((block) => block.type === "text")
 				.map((block) => block.text)
 				.join("\n");
+			let output = isError ? theme.fg("error", nativeText || "Error") : nativeText;
 			if (!isError) {
 				const previews = readToolPreview(name, result.details, context.args);
-				if (previews) return setPreviewChanges(component, previews, options, theme, context);
+				if (previews) {
+					if (previews.changes.length || previews.omittedChanges === 0) {
+						return setPreviewChanges(component, previews, options, theme, context);
+					}
+					output = [...captureNotices(previews, theme), nativeText].join("\n");
+				}
 			}
-			const output = isError ? theme.fg("error", nativeText || "Error") : nativeText;
 			component.setView(JSON.stringify([isError, output, themeCacheKey(theme)]), () => output, context.invalidate);
 			return component;
 		},

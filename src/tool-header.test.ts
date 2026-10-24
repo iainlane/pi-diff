@@ -1,7 +1,10 @@
 import type { ToolRendererResolver, ToolRenderers } from "@earendil-works/pi-coding-agent";
 import { Box, type Component, Spacer, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
+import * as diff from "./core/diff.js";
 import diffRendererExtension, { __testing } from "./index.js";
+import * as toolRenderers from "./rendering/tool-renderers.js";
+import * as hunkPreview from "./review/hunk-preview.js";
 
 vi.mock("./core/config.js", () => ({
 	configIndicatorStyle: () => undefined,
@@ -64,6 +67,22 @@ function shell(padding: number, ...components: Component[]): string[] {
 	for (const component of components) box.addChild(component);
 	return [...new Spacer(1).render(80), ...box.render(80)].map(stripTerminalSequences);
 }
+
+it("exports the live parsing and rendering helpers", () => {
+	expect(__testing).toStrictEqual({
+		computeHunkBlocks: diff.computeHunkBlocks,
+		formatToolHeaderName: toolRenderers.formatToolHeaderName,
+		formatToolHeaderPath: toolRenderers.formatToolHeaderPath,
+		isToolResultError: toolRenderers.isToolResultError,
+		normalizeShikiContrast: hunkPreview.normalizeShikiContrast,
+		getSepStyle: diff.getSepStyle,
+		parseDiff: diff.parseDiff,
+		parsePatchFiles: diff.parsePatchFiles,
+		resolveSepStyle: diff.resolveSepStyle,
+		renderSplit: hunkPreview.renderSplit,
+		renderUnified: hunkPreview.renderUnified,
+	});
+});
 
 describe("tool header formatting", () => {
 	it.each([

@@ -258,12 +258,12 @@ All listed symbols are exposed under the `__testing` export for unit tests:
 | -------------------------- | ----------------------- | ----------------------------------------------------------------------- |
 | `parseDiff()`              | `core/diff.ts`          | Convert old/new content to structured `DiffLine[]` (added/removed/chars) |
 | `parsePatchFiles()`        | `core/diff.ts`          | Parse a full `git apply` patch into per-file diff objects               |
-| `resolveSepStyle()`        | `core/diff.ts`          | Pick the per-side separator style (` │ ` vs `╱`) for split view         |
-| `getSepStyle()`            | `review/hunk-preview.ts`| Same as above for the shared rendering layer                            |
-| `computeHunkBlocks()`      | `review/hunk-preview.ts`| Build add/remove/modify line blocks with column ranges for split view   |
-| `renderSplit()`            | `review/hunk-preview.ts`| Side-by-side renderer with diagonal stripe fillers                      |
+| `resolveSepStyle()`        | `core/diff.ts`          | Resolve the hunk-separator style from `PI_DIFF_SEP_STYLE`                 |
+| `getSepStyle()`            | `core/diff.ts`          | Return the current hunk-separator style                                  |
+| `computeHunkBlocks()`      | `core/diff.ts`          | Group consecutive deletions followed by consecutive additions            |
+| `renderSplit()`            | `review/hunk-preview.ts`| Side-by-side renderer with unified fallback                              |
 | `renderUnified()`          | `review/hunk-preview.ts`| Stacked single-column renderer                                          |
-| `normalizeShikiContrast()` | `review/hunk-preview.ts` | Lighten/darken Shiki output to match the surrounding TUI theme        |
+| `normalizeShikiContrast()` | `review/hunk-preview.ts` | Replace dark Shiki foregrounds with the configured safe foreground    |
 
 ### Rendering constants
 

@@ -304,43 +304,35 @@ function mixBg(
 	return `\x1b[48;2;${r};${g};${b}m`;
 }
 
+function themeColor(read: () => string | undefined): string {
+	try {
+		return read() ?? "";
+	} catch {
+		return "";
+	}
+}
+
 function autoDeriveBgFromTheme(theme: any): void {
 	if (!theme?.getFgAnsi) return;
-	try {
-		const fgAdd = theme.getFgAnsi("toolDiffAdded");
-		const fgDel = theme.getFgAnsi("toolDiffRemoved");
-		const addRgb = parseAnsiRgb(fgAdd);
-		const delRgb = parseAnsiRgb(fgDel);
-		if (!addRgb || !delRgb) return;
+	const addRgb = parseAnsiRgb(themeColor(() => theme.getFgAnsi("toolDiffAdded")));
+	const delRgb = parseAnsiRgb(themeColor(() => theme.getFgAnsi("toolDiffRemoved")));
+	if (!addRgb || !delRgb) return;
 
-		let addBase = { r: 0, g: 0, b: 0 };
-		let delBase = addBase;
-		if (theme.getBgAnsi) {
-			try {
-				const successBgAnsi = theme.getBgAnsi("toolSuccessBg");
-				const successParsed = parseAnsiRgb(successBgAnsi);
-				if (successParsed) {
-					addBase = successParsed;
-					delBase = successParsed;
-					BG_BASE = successBgAnsi;
-				}
-			} catch {}
-			try {
-				const errorParsed = parseAnsiRgb(theme.getBgAnsi("toolErrorBg"));
-				if (errorParsed) delBase = errorParsed;
-			} catch {}
-		}
+	const successBgAnsi = themeColor(() => theme.getBgAnsi?.("toolSuccessBg"));
+	const successParsed = parseAnsiRgb(successBgAnsi);
+	const addBase = successParsed ?? { r: 0, g: 0, b: 0 };
+	const delBase = parseAnsiRgb(themeColor(() => theme.getBgAnsi?.("toolErrorBg"))) ?? addBase;
+	if (successParsed) BG_BASE = successBgAnsi;
 
-		BG_ADD = mixBg(addBase, addRgb, 0.15);
-		BG_DEL = mixBg(delBase, delRgb, 0.18);
-		BG_ADD_W = mixBg(addBase, addRgb, 0.3);
-		BG_DEL_W = mixBg(delBase, delRgb, 0.35);
-		BG_GUTTER_ADD = mixBg(addBase, addRgb, 0.1);
-		BG_GUTTER_DEL = mixBg(delBase, delRgb, 0.12);
-		BG_EMPTY = BG_BASE;
-		RST = `\x1b[0m${BG_BASE}`;
-		DIVIDER = `${FG_RULE}${RST}`;
-	} catch {}
+	BG_ADD = mixBg(addBase, addRgb, 0.15);
+	BG_DEL = mixBg(delBase, delRgb, 0.18);
+	BG_ADD_W = mixBg(addBase, addRgb, 0.3);
+	BG_DEL_W = mixBg(delBase, delRgb, 0.35);
+	BG_GUTTER_ADD = mixBg(addBase, addRgb, 0.1);
+	BG_GUTTER_DEL = mixBg(delBase, delRgb, 0.12);
+	BG_EMPTY = BG_BASE;
+	RST = `\x1b[0m${BG_BASE}`;
+	DIVIDER = `${FG_RULE}${RST}`;
 }
 
 function loadDiffConfig(): DiffUserConfig {
@@ -481,14 +473,11 @@ export function resolveDiffColors(theme?: any): DiffColors {
 	}
 	_lastResolvedThemeKey = currentThemeKey;
 	if (theme?.getBgAnsi && BG_BASE === BG_DEFAULT) {
-		try {
-			const bgAnsi = theme.getBgAnsi("toolSuccessBg");
-			const parsed = parseAnsiRgb(bgAnsi);
-			if (parsed) {
-				BG_BASE = bgAnsi;
-				RST = `\x1b[0m${BG_BASE}`;
-			}
-		} catch {}
+		const bgAnsi = themeColor(() => theme.getBgAnsi("toolSuccessBg"));
+		if (parseAnsiRgb(bgAnsi)) {
+			BG_BASE = bgAnsi;
+			RST = `\x1b[0m${BG_BASE}`;
+		}
 	}
 	if (_autoDerivePending && theme?.getFgAnsi) {
 		autoDeriveBgFromTheme(theme);
@@ -572,7 +561,7 @@ function isLowContrastShikiFg(params: string): boolean {
 	return luminance < 72;
 }
 
-function normalizeShikiContrast(ansi: string): string {
+export function normalizeShikiContrast(ansi: string): string {
 	return ansi.replace(ANSI_PARAM_CAPTURE_RE, (sequence, params: string) =>
 		isLowContrastShikiFg(params) ? FG_SAFE_MUTED : sequence,
 	);

@@ -4,6 +4,30 @@ All notable changes to `@heyhuynhgiabuu/pi-diff` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Grouped, expandable diffs for native edits and writes within one codemode invocation, including scripts that print no edit results. Captured previews remain available after reopening a session.
+
+### Changed
+
+- Native `edit` and `write` results start as compact summaries. Expansion shows all captured changed hunks, without the former 60/150-line limits. The `maxPreviewLines` and `maxRenderLines` configuration keys are ignored.
+- Require Pi 1.1.0 or later.
+- Bound capture to 256 KiB of source text per file operation, 64 operations per codemode result and 1 MiB of stored preview data per result. Omitted previews and incomplete tracking are reported explicitly; expansion cannot recover omitted data.
+
+### Removed
+
+- Remove the custom `apply_patch` tool, including its prepare-all-changes step and best-effort multi-file rollback. Use native `edit` and `write`, optionally grouped in codemode, and `bash` for deletion or moves. See the [migration guide][native-edit-migration].
+
+[native-edit-migration]: README.md#migration-from-apply_patch
+
+### Fixed
+
+- Capture overwrite previews inside Pi's mutation queue and check cancellation after reading previous contents.
+- Preserve native success messages when preview capture is omitted. Show an incompleteness warning without totals when neither captured changes nor omission counts are available.
+- Make `__testing` exports reference the active rendering implementation.
+
 ## [0.9.3] — 2026-10-08
 
 ### Changed

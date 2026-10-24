@@ -203,16 +203,20 @@ describe("composed codemode renderer", () => {
 		expect(output).toContain("4 changes omitted from capture");
 		expect(output).toContain("7 lines omitted from capture");
 		expect(output).toContain("capture incomplete");
-		const unknown = lines(
-			renderer().renderResult?.(
-				result({ version: 1, changes: [], omittedChanges: 0, incomplete: true }),
-				options,
-				theme,
-				context(),
-			) as Component,
-		);
-		expect(unknown).toContain("capture incomplete");
-		expect(unknown).not.toContain("1 change");
+	});
+
+	it.each([false, true])("shows only a warning for unknown capture loss with expanded=%s", async (expanded) => {
+		const data: ToolPreviewDetails = { version: 1, changes: [], omittedChanges: 0, incomplete: true };
+		const native = result(data, ["native output"]);
+		const before = structuredClone(native);
+		const component = renderer().renderResult?.(native, { ...options, expanded }, theme, context()) as Component;
+		expect(
+			(await settled(component))
+				.split("\n")
+				.map((line) => line.trim())
+				.filter(Boolean),
+		).toStrictEqual(["native output", "Preview capture incomplete"]);
+		expect(native).toStrictEqual(before);
 	});
 
 	it("renders stored JSON grouped by file, keeping repeated operations in recorded order", async () => {

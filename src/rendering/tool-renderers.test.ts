@@ -192,6 +192,29 @@ describe("native tool renderers", () => {
 		expect(result).toStrictEqual(before);
 	});
 
+	it.each([false, true])("preserves native write output when capture is omitted with expanded=%s", async (expanded) => {
+		const result = {
+			content: [
+				{ type: "text" as const, text: "Successfully wrote to file.txt" },
+				{ type: "text" as const, text: "native follow-up" },
+			],
+			details: { piDiff: { version: 1, changes: [], omittedChanges: 1 } },
+		};
+		const before = structuredClone(result);
+		const component = createToolRenderers("write").renderResult?.(
+			result,
+			{ ...options, expanded },
+			theme,
+			context(),
+		) as Component;
+		expect((await settled(component)).map((line) => line.trimEnd())).toStrictEqual([
+			"1 change omitted from capture",
+			"Successfully wrote to file.txt",
+			"native follow-up",
+		]);
+		expect(result).toStrictEqual(before);
+	});
+
 	it("honors the context error flag and preserves fallback native output", () => {
 		const renderers = createToolRenderers("write");
 		const result = { content: [{ type: "text" as const, text: "native diagnostic" }], details: undefined };
@@ -495,6 +518,46 @@ describe("shared preview changes", () => {
 			140,
 			{ compactGutter: true },
 		);
+	});
+
+	it.each([
+		{ missingToken: undefined, added: "\x1b[48;2;49;70;69m", removed: "\x1b[48;2;102;92;100m" },
+		{ missingToken: "toolSuccessBg", added: "\x1b[48;2;15;27;18m", removed: "\x1b[48;2;102;92;100m" },
+		{ missingToken: "toolErrorBg", added: "\x1b[48;2;49;70;69m", removed: "\x1b[48;2;69;59;67m" },
+	])("renders fallback backgrounds when the unavailable token is $missingToken", async ({
+		missingToken,
+		added,
+		removed,
+	}) => {
+		const getBgAnsi = (name: string) => {
+			if (name === missingToken) throw new Error(`Unsupported theme token ${name}`);
+			return name === "toolSuccessBg" ? "\x1b[48;2;40;50;60m" : "\x1b[48;2;80;90;100m";
+		};
+		const palette = {
+			...themeStub,
+			bg: (name: string, text: string) => `${getBgAnsi(name)}${text}\x1b[0m`,
+			getFgAnsi: (name: string) => (name === "toolDiffRemoved" ? "\x1b[38;2;200;100;100m" : "\x1b[38;2;100;180;120m"),
+			getBgAnsi,
+		} satisfies ThemeStub;
+		const diff = parseDiff("old();", "new();");
+		const output = await hunkPreview.renderSplit(
+			diff,
+			undefined,
+			diff.lines.length,
+			hunkPreview.resolveDiffColors(palette),
+			52,
+			{ compactGutter: true },
+		);
+		const painted = ["old();", "new();"].map((code) => {
+			const line = output.split("\n").find((line) => stripTerminalSequences(line).includes(code));
+			if (!line) throw new Error(`Missing rendered diff row for ${code}`);
+			const prefix = line.slice(0, line.indexOf("("));
+			return { code, background: prefix.slice(prefix.lastIndexOf("\x1b[")) };
+		});
+		expect(painted).toStrictEqual([
+			{ code: "old();", background: removed },
+			{ code: "new();", background: added },
+		]);
 	});
 
 	it.each(["dark", "light"])("uses shared theme colors for the %s palette", async (appearance) => {
