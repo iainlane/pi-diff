@@ -21,7 +21,11 @@ function retainedBytes(preview: ToolPreviewDetails): number {
 	return Buffer.byteLength(JSON.stringify({ ...preview, omittedChanges: Number.MAX_SAFE_INTEGER }), "utf8");
 }
 
-export function registerCodemodePreviews(pi: ExtensionAPI): void {
+export function registerCodemodePreviews(
+	pi: ExtensionAPI,
+	options: { disabledTools?: readonly ("edit" | "write")[] } = {},
+): void {
+	const disabledTools = new Set(options.disabledTools);
 	const pending = new Map<string, { preview: ToolPreviewDetails; bytes: number }>();
 	let pendingBytes = 0;
 	let trackingOverflowed = false;
@@ -52,7 +56,8 @@ export function registerCodemodePreviews(pi: ExtensionAPI): void {
 		if (
 			event.isError ||
 			event.parentToolCallId === undefined ||
-			(event.toolName !== "edit" && event.toolName !== "write")
+			(event.toolName !== "edit" && event.toolName !== "write") ||
+			disabledTools.has(event.toolName)
 		)
 			return;
 		const incoming = readToolPreview(event.toolName, event.details, event.input);

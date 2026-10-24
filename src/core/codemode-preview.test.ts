@@ -11,14 +11,14 @@ import {
 	writePreviewDetails,
 } from "./tool-preview.js";
 
-function harness() {
+function harness(options?: Parameters<typeof registerCodemodePreviews>[1]) {
 	const handlers = new Map<string, (event: never, context: never) => unknown>();
 	const pi = {
 		on: (name: string, handler: (event: never, context: never) => unknown) => {
 			handlers.set(name, handler);
 		},
 	} as unknown as ExtensionAPI;
-	registerCodemodePreviews(pi);
+	registerCodemodePreviews(pi, options);
 	return {
 		result: (event: ToolResultEvent) =>
 			handlers.get("tool_result")?.(event as never, undefined as never) as ToolResultEventResult | undefined,
@@ -66,6 +66,49 @@ describe("codemode preview persistence", () => {
 		});
 		expect(events.result(child)).toBeUndefined();
 		expect(saved(events.result(result()))).toStrictEqual(readToolPreview("edit", child.details, child.input));
+	});
+
+	it.each([
+		"edit",
+		"write",
+	] as const)("excludes disabled %s results without suppressing the enabled tool", (disabled) => {
+		const events = harness({ disabledTools: [disabled] });
+		const edit = result({
+			toolName: "edit",
+			toolCallId: "edit-child",
+			parentToolCallId: "parent",
+			input: { path: "a.ts" },
+			details: { patch: createTwoFilesPatch("a.ts", "a.ts", "old\n", "new\n") },
+		});
+		const children = [edit, write()];
+		for (const child of children) events.result(child);
+		const enabled = children.find((child) => child.toolName !== disabled);
+		expect(saved(events.result(result()))).toStrictEqual(
+			enabled && readToolPreview(enabled.toolName, enabled.details, enabled.input),
+		);
+	});
+
+	it("collects nothing when both native tools are disabled", () => {
+		const events = harness({ disabledTools: ["edit", "write"] });
+		for (const toolName of ["edit", "write"]) events.result({ ...write(), toolName });
+		expect(events.result(result())).toBeUndefined();
+	});
+
+	it("does not count disabled-tool omissions or exhaust parent tracking capacity", () => {
+		const events = harness({ disabledTools: ["write"] });
+		for (let i = 0; i < 1000; i++) {
+			events.result({ ...write(`${i}`), details: { piDiff: { version: 1, changes: [], omittedChanges: 20 } } });
+		}
+		expect(events.result(result({ toolCallId: "999" }))).toBeUndefined();
+		const edit = result({
+			toolName: "edit",
+			toolCallId: "enabled-edit",
+			parentToolCallId: "parent",
+			input: { path: "a.ts" },
+			details: { patch: createTwoFilesPatch("a.ts", "a.ts", "old\n", "new\n") },
+		});
+		events.result(edit);
+		expect(saved(events.result(result()))).toStrictEqual(readToolPreview("edit", edit.details, edit.input));
 	});
 
 	it("keeps operation order, repeated paths, and concurrent parent calls separate", async () => {
