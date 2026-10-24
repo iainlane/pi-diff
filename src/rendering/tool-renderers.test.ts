@@ -11,13 +11,15 @@ vi.mock("../review/hunk-preview.js", async (importOriginal) => {
 	return { ...actual, renderSplit: vi.fn(actual.renderSplit) };
 });
 
-const theme = {
+type ThemeStub = Pick<Theme, "fg" | "bg" | "bold" | "getFgAnsi" | "getBgAnsi">;
+const themeStub = {
 	fg: (_name: string, text: string) => text,
 	bg: (_name: string, text: string) => text,
 	bold: (text: string) => text,
 	getFgAnsi: () => "\x1b[38;2;100;180;120m",
 	getBgAnsi: () => "\x1b[48;2;10;10;10m",
-} as unknown as Theme;
+} satisfies ThemeStub;
+const theme = themeStub as unknown as Theme;
 const options = { expanded: false, isPartial: false };
 function context(overrides: Partial<ResultRenderContext> = {}): ResultRenderContext {
 	return {
@@ -469,12 +471,17 @@ describe("shared preview changes", () => {
 	it.each(["dark", "light"])("uses shared theme colors for the %s palette", async (appearance) => {
 		const color = appearance === "light" ? "\x1b[38;2;20;70;30m" : "\x1b[38;2;140;230;160m";
 		const palette = {
-			...theme,
+			...themeStub,
 			fg: (_name: string, text: string) => `${color}${text}\x1b[0m`,
 			getFgAnsi: () => color,
 			getBgAnsi: () => (appearance === "light" ? "\x1b[48;2;250;250;250m" : "\x1b[48;2;10;10;10m"),
-		} as Theme;
-		const component = renderPreviewChanges(preview(), { ...options, expanded: true }, palette, context());
+		} satisfies ThemeStub;
+		const component = renderPreviewChanges(
+			preview(),
+			{ ...options, expanded: true },
+			palette as unknown as Theme,
+			context(),
+		);
 		await settled(component);
 		expect(component.render(100).join("\n")).toContain(color);
 		expect(hunkPreview.renderSplit).toHaveBeenCalledWith(
