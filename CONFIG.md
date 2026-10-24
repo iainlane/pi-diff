@@ -35,17 +35,19 @@ All other settings use defaults. See the full reference below.
 
 ### Tool behavior
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `disabledTools` | `("write" | "edit" | "apply_patch")[]` | `[]` | Tools pi-diff does not register. `write` and `edit` fall back to Pi's built-ins; `apply_patch` is unavailable. |
+| Option          | Type                    | Default | Description                                                                                                          |
+|-----------------|-------------------------|---------|----------------------------------------------------------------------------------------------------------------------|
+| `disabledTools` | `("write" \| "edit")[]` | `[]`    | Tools to exclude from pi-diff adapters and presentation, including codemode previews. Native tools remain available. |
 
-For example, to remove the custom patch tool:
+For example, to keep native write output:
 
 ```json
 {
-	"disabledTools": ["apply_patch"]
+	"disabledTools": ["write"]
 }
 ```
+
+The custom `apply_patch` tool has been removed. Use native `edit` and `write`, optionally grouped in codemode. Expansion shows all captured changed hunks; it does not recover previews omitted at capture time.
 
 ### Color
 
@@ -61,8 +63,8 @@ For example, to remove the custom patch tool:
 |--------|------|---------|-------------|
 | `splitMinWidth` | `integer` | — | **Not read; ignored.** Use env `DIFF_SPLIT_MIN_WIDTH` (runtime default `80` renderer columns). |
 | `splitMinCodeWidth` | `integer` | — | **Not read; ignored.** Use env `DIFF_SPLIT_MIN_CODE_WIDTH` (runtime default `24`). |
-| `maxPreviewLines` | `integer` | `60` | Max lines in edit preview |
-| `maxRenderLines` | `integer` | `150` | Max lines in write output |
+| `maxPreviewLines` | `integer` | `60` | Not read. Expanded views show all captured changed hunks. |
+| `maxRenderLines` | `integer` | `150` | Not read. Expanded views show all captured changed hunks. |
 | `wordDiffMinSimilarity` | `number` | `0.15` | Similarity threshold for word-diff (0–1) |
 
 #### Split view thresholds (environment variables)

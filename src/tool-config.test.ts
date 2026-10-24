@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidatePiDiffConfig } from "./core/config.js";
+import { readToolPreview } from "./core/tool-preview.js";
 import diffRendererExtension from "./index.js";
 
 describe("disabledTools configuration", () => {
@@ -21,18 +22,17 @@ describe("disabledTools configuration", () => {
 		rmSync(tempDir, { recursive: true, force: true });
 	});
 
-	it("does not register apply_patch when it is disabled", async () => {
-		writeFileSync(join(tempDir, "pi-diff.json"), JSON.stringify({ disabledTools: ["apply_patch"] }));
+	it("leaves disabled native tools to the host", async () => {
+		writeFileSync(join(tempDir, "pi-diff.json"), JSON.stringify({ disabledTools: ["write"] }));
 		const registeredTools: string[] = [];
 
 		await diffRendererExtension({
 			on: () => {},
+			registerToolRenderer: () => {},
 			registerTool: (tool: { name: string }) => registeredTools.push(tool.name),
 		} as never);
 
-		expect(registeredTools).toContain("write");
-		expect(registeredTools).toContain("edit");
-		expect(registeredTools).not.toContain("apply_patch");
+		expect(registeredTools).toStrictEqual(["edit"]);
 	});
 
 	describe("edit safety contract", () => {
@@ -44,6 +44,7 @@ describe("disabledTools configuration", () => {
 			}> = [];
 			await diffRendererExtension({
 				on: () => {},
+				registerToolRenderer: () => {},
 				registerTool: (tool: {
 					name: string;
 					execute: (...args: any[]) => Promise<any>;
@@ -147,8 +148,10 @@ describe("disabledTools configuration", () => {
 				undefined,
 				undefined,
 			);
-			const removed = result.details?.diff?.lines.find((line: { type: string }) => line.type === "del");
-			expect(removed?.content).toBe("const x = 1;  ");
+			const preview = readToolPreview("edit", result.details, { path: file })?.changes[0];
+			if (preview?.kind !== "diff") throw new Error("Expected a native edit patch preview");
+			const removed = preview.diff.lines.find((line) => line.type === "del");
+			expect(removed).toStrictEqual({ type: "del", content: "const x = 1;  ", oldNum: 1, newNum: null });
 		});
 
 		it("accepts legacy oldText and newText fields", async () => {
@@ -187,7 +190,11 @@ describe("disabledTools configuration", () => {
 				undefined,
 				undefined,
 			);
-			expect(result.details?._type).toBe("multiEditInfo");
+			expect(result.details).toStrictEqual({
+				diff: expect.any(String),
+				patch: expect.any(String),
+				firstChangedLine: 1,
+			});
 			expect(readFileSync(file, "utf8")).toBe("const a = 10;\nconst b = 20;\n");
 		});
 	});

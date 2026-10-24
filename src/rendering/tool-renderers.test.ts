@@ -112,6 +112,26 @@ describe("native tool renderers", () => {
 		expect(output).not.toContain("ctrl+o");
 	});
 
+	it.each([
+		{ name: "edit", expanded: false },
+		{ name: "edit", expanded: true },
+		{ name: "write", expanded: false },
+		{ name: "write", expanded: true },
+	] as const)("warns for JSON-decoded incomplete $name details with expanded=$expanded", async ({ name, expanded }) => {
+		const result = { content: [], details: JSON.parse(JSON.stringify({ piDiff: { ...preview(), incomplete: true } })) };
+		const before = structuredClone(result);
+		const component = createToolRenderers(name).renderResult?.(
+			result,
+			{ ...options, expanded },
+			theme,
+			context(),
+		) as Component;
+		const output = (await settled(component)).join("\n");
+		expect(output).toContain("Preview capture incomplete");
+		expect(output).not.toContain("omitted from capture");
+		expect(result).toEqual(before);
+	});
+
 	it("honors the context error flag and preserves fallback native output", () => {
 		const renderers = createToolRenderers("write");
 		const result = { content: [{ type: "text" as const, text: "native diagnostic" }], details: undefined };
@@ -173,6 +193,63 @@ describe("shared preview changes", () => {
 		const output = lines(renderPreviewChanges(data, options, theme, context())).join("\n");
 		expect(output).toContain("3 lines omitted from capture");
 		expect(output).toContain("1 change omitted from capture");
+	});
+
+	it.each([
+		{ expanded: false, omittedChanges: 0 },
+		{ expanded: true, omittedChanges: 0 },
+		{ expanded: false, omittedChanges: 2 },
+		{ expanded: true, omittedChanges: 2 },
+	])("keeps incomplete capture independent of known omissions=$omittedChanges with expanded=$expanded", async ({
+		expanded,
+		omittedChanges,
+	}) => {
+		const data: ToolPreviewDetails = { ...preview(), incomplete: true, omittedChanges };
+		if (data.changes[0].kind === "diff") data.changes[0].omittedLines = omittedChanges ? 3 : 0;
+		const component = renderPreviewChanges(data, { ...options, expanded }, theme, context());
+		expect(lines(component).join("\n")).toContain("Preview capture incomplete");
+		const output = (await settled(component)).join("\n");
+		expect(output.match(/Preview capture incomplete/g)).toHaveLength(1);
+		if (omittedChanges) {
+			expect(output).toContain("2 changes omitted from capture");
+			expect(output).toContain("3 lines omitted from capture");
+		} else {
+			expect(output).not.toContain("omitted from capture");
+		}
+		if (expanded) expect(output).toContain("new();");
+	});
+
+	it.each([false, true])("invalidates the cached incomplete warning with expanded=%s", async (expanded) => {
+		const ctx = context();
+		const complete = preview();
+		const component = renderPreviewChanges(complete, { ...options, expanded }, theme, ctx);
+		expect((await settled(component)).join("\n")).not.toContain("Preview capture incomplete");
+		expect(renderPreviewChanges({ ...complete, incomplete: true }, { ...options, expanded }, theme, ctx)).toBe(
+			component,
+		);
+		expect((await settled(component)).join("\n")).toContain("Preview capture incomplete");
+		expect(renderPreviewChanges(complete, { ...options, expanded }, theme, ctx)).toBe(component);
+		expect((await settled(component)).join("\n")).not.toContain("Preview capture incomplete");
+	});
+
+	it.each([
+		false,
+		true,
+	])("updates the incomplete warning when only its theme color changes with expanded=%s", async (expanded) => {
+		const ctx = context();
+		const data: ToolPreviewDetails = { ...preview(), incomplete: true };
+		const warningTheme = (label: string) =>
+			({
+				...theme,
+				fg: (name: Parameters<Theme["fg"]>[0], text: string) =>
+					name === "warning" ? `${label}:${text}` : theme.fg(name, text),
+			}) as Theme;
+		const component = renderPreviewChanges(data, { ...options, expanded }, warningTheme("old"), ctx);
+		expect((await settled(component)).join("\n")).toContain("old:Preview capture incomplete");
+		expect(renderPreviewChanges(data, { ...options, expanded }, warningTheme("new"), ctx)).toBe(component);
+		const output = (await settled(component)).join("\n");
+		expect(output).toContain("new:Preview capture incomplete");
+		expect(output).not.toContain("old:Preview capture incomplete");
 	});
 
 	it.each([0, 1])("leaves outputPad=%s to the host shell", async (outputPad) => {

@@ -56,7 +56,9 @@ export function registerCodemodePreviews(
 					? { version: 1 as const, changes: [], omittedChanges: 0, incomplete: true as const }
 					: undefined);
 			if (!preview) return;
-			return { details: { ...(isRecord(event.details) ? event.details : {}), piDiff: preview } };
+			const details: Record<string, unknown> = isRecord(event.details) ? { ...event.details } : {};
+			details.piDiff = preview;
+			return { details };
 		}
 
 		if (
@@ -76,12 +78,8 @@ export function registerCodemodePreviews(
 				trackingOverflowed = true;
 				return;
 			}
-			const preview: ToolPreviewDetails = {
-				version: 1,
-				changes: [],
-				omittedChanges: 0,
-				...(trackingOverflowed ? { incomplete: true as const } : {}),
-			};
+			const preview: ToolPreviewDetails = { version: 1, changes: [], omittedChanges: 0 };
+			if (trackingOverflowed) preview.incomplete = true;
 			parent = { preview, bytes: retainedBytes(preview) };
 			pending.set(parentId, parent);
 			pendingBytes += parent.bytes;

@@ -21,7 +21,9 @@ A [pi](https://pi.dev) extension that replaces the default `write` and `edit` to
 - **Split view** — side-by-side comparison for `edit` and `write` overwrite previews; falls back to unified on narrow terminals, unbalanced changes, or wrap-heavy hunks
 - **Unified view** — stacked single-column layout; the fallback when split view's thresholds are not met
 - **Word-level emphasis** — changed characters get brighter backgrounds so you see exactly what changed
-- **New file preview** — syntax-highlighted preview when creating files
+- Edit and write results start as compact summaries. Pi's tool expansion action reveals the captured diff.
+- Edits and writes inside one codemode call appear in a grouped, expandable diff section, even when the script prints no results.
+- New-file previews show syntax-highlighted content.
 - **Adaptive layout** — auto-detects terminal width; wraps intelligently on wide terminals, truncates on narrow ones
 - **LRU cache** — singleton Shiki highlighter with 192-entry cache for fast re-renders
 - **Large diff fallback** — gracefully degrades (skips highlighting, still shows diff structure) for files > 80k chars
@@ -36,6 +38,8 @@ pi install npm:@heyhuynhgiabuu/pi-diff
 
 Latest release: https://github.com/buddingnewinsights/pi-diff/releases/latest
 
+Requires Pi 1.1.0 or later.
+
 Or load directly for development:
 
 ```bash
@@ -44,20 +48,28 @@ pi -e ./src/index.ts
 
 ## How It Works
 
-pi-diff wraps the built-in `write` and `edit` tools from the pi SDK, including single-edit and multi-edit `edit` calls. When the agent writes or edits a file:
+pi-diff uses Pi's [tool renderer API][tool-renderers] for presentation and native tool factories for execution. Native parameter schemas, prompt guidance, cancellation and file-mutation ordering remain in place.
 
-1. **Before the write** — reads the existing file content
-2. **Delegates** to the original SDK tool (file is actually written)
-3. **After the write** — computes a structured diff between old and new content
-4. **Renders** the diff with syntax highlighting and word-level emphasis
+For `edit`, the renderer parses the unified patch returned by Pi. The preview therefore includes the actual matched source, including whitespace. A native-factory adapter also preserves pi-diff's existing check for ambiguous overlapping occurrences.
 
-For `edit` calls, Pi's SDK performs matching, uniqueness and overlap validation, mutation queueing, and the file write. pi-diff adapts the SDK's returned unified patch into its syntax-highlighted renderer, so the preview reflects the actual matched source rather than the requested text.
+For `write`, a small native-factory adapter reads previous contents inside Pi's mutation queue immediately before the write. The renderer uses that captured state, not a later filesystem read. Previous contents that cannot be read do not prevent an otherwise valid native write; the result reports that its preview was omitted.
 
-### `apply_patch` safety contract
+Nested edit/write result events provide the diffs for codemode. The parent result preserves these previews for session reopening without changing the script's output. Multiple edits to the same file remain ordered operations, not a reconstructed net diff. Other codemode rendering remains available through renderer composition.
 
-`apply_patch` remains a separate structured JSON tool for multi-file add, update, delete, and move operations. Paths are resolved relative to Pi's current workspace and must remain inside it; ancestor symlinks are rejected. Updates may use one `oldText`/`newText` replacement or an `edits` array of disjoint replacements matched against the original file. Matching is exact first, then tolerates escaped sequences and Unicode/trailing-whitespace drift; a match is accepted only when it is unique, and ambiguous or missing `oldText` fails with a specific error.
+[tool-renderers]: https://github.com/earendil-works/pi/blob/v1.4.0/packages/coding-agent/docs/extensions.md#tool-rendering
 
-All changes are prepared before the first commit. A commit failure triggers reverse-order rollback, but filesystem rollback is necessarily best effort; callers should treat a failed result as requiring verification. Existing files are never intentionally clobbered by `add` or `move`, and invalid UTF-8 files are rejected rather than rewritten as text.
+### Migration from `apply_patch`
+
+The custom `apply_patch` tool has been removed. Use native `edit` for disjoint replacements within one file, `write` for file creation or complete rewrites, and `bash` for deletion or moves. For changes across multiple files, issue several native calls or group them in codemode:
+
+```javascript
+await tools.edit({ path: "src/a.ts", edits: [{ oldText: "return 1;", newText: "return 2;" }] });
+await tools.edit({ path: "src/b.ts", edits: [{ oldText: "return 3;", newText: "return 4;" }] });
+```
+
+These calls use native editing and prose-check hooks. They do not provide the removed tool's prepare-all-changes step or best-effort multi-file rollback. Update scripts and prompts that explicitly call `apply_patch`.
+
+Previews are limited to 256 KiB per file operation, 64 operations per codemode result and 1 MiB of stored preview data per result. Omitted previews are reported explicitly. Expanding a tool shows all captured changed hunks; it cannot recover data omitted at capture time.
 
 The rendering pipeline:
 
@@ -74,7 +86,7 @@ New content ──┘                                          │
 
 | View        | Used by      | Description                                                                                                                                                       |
 | ----------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Split**   | `edit`, `write` (overwrites), `apply_patch` updates | Side-by-side with old on left, new on right. Diagonal stripes fill empty slots. Used only when the renderer width is at least 80 columns (`DIFF_SPLIT_MIN_WIDTH`), each code column is at least 24 columns (`DIFF_SPLIT_MIN_CODE_WIDTH`), the preview has both removed and added lines within a 2× ratio, fewer than 10 lines would wrap, and less than 35% of lines would wrap. Otherwise falls back to unified. |
+| **Split**   | `edit`, `write` (overwrites), codemode file changes | Side-by-side with old on left, new on right. Diagonal stripes fill empty slots. Used only when the renderer width is at least 80 columns (`DIFF_SPLIT_MIN_WIDTH`), each code column is at least 24 columns (`DIFF_SPLIT_MIN_CODE_WIDTH`), the preview has both removed and added lines within a 2× ratio, fewer than 10 lines would wrap, and less than 35% of lines would wrap. Otherwise falls back to unified. |
 | **Unified** | Fallback for the same previews | Single column with `+`/`-` gutter. Compact, works at any terminal width. |
 
 The renderer width is the available tool area after Pi applies output padding (`0` or `1` on each side). In a full-width tool area, padding 1 leaves an 82-column terminal with 80 renderer columns; narrower panes can reduce this further. Meeting the width threshold alone does not guarantee split: the other checks above still apply. New-file previews use their own view and are not split.
@@ -90,11 +102,11 @@ Both views show:
 
 ### Disable pi-diff tools
 
-Add `disabledTools` to `pi-diff.json` to omit pi-diff tools. Disabling `write` or `edit` leaves Pi's built-in tool available; disabling `apply_patch` removes that custom tool.
+Add `disabledTools` to `pi-diff.json` to omit pi-diff's adapter and presentation for a tool, including its codemode previews. Pi's native tool remains available.
 
 ```json
 {
-  "disabledTools": ["apply_patch"]
+  "disabledTools": ["write"]
 }
 ```
 
@@ -220,17 +232,20 @@ export DIFF_SPLIT_MIN_WIDTH=60
 
 ```
 src/
-├── index.ts            # Extension entry point — wraps write/edit tools with diff rendering
-├── core/               # Pure data layer: diff parsing, conflict detection, line resolution
+├── index.ts                       # Package re-exports
+├── extension.ts                   # Tool and renderer registration
+├── core/
 │   ├── config.ts
-│   ├── conflicts.ts
-│   ├── diff.ts         # parseDiff, parsePatchFiles, resolveSepStyle
-│   ├── replace.ts      # conservative apply_patch matcher and legacy helpers
-│   ├── resolve-lines.ts
-│   └── *.test.ts
-└── review/             # Shared diff-rendering primitives used by the main extension
-    ├── git.ts          # read git diffs from disk (execFileSync)
-    └── hunk-preview.ts # renderSplit, renderUnified, theme helpers (re-exported via __testing)
+│   ├── diff.ts                    # Patch parsing and diff data
+│   ├── native-tools.ts            # Native execution adapters
+│   ├── tool-preview.ts            # Bounded preview data and validation
+│   └── codemode-preview.ts        # Nested result capture and persistence
+├── rendering/
+│   ├── tool-renderers.ts          # Compact and expanded views
+│   └── codemode-renderer.ts       # Composition with codemode presentation
+└── review/
+    ├── git.ts
+    └── hunk-preview.ts            # Shared highlighting and diff layout
 ```
 
 ### Key internals
@@ -250,13 +265,14 @@ All listed symbols are exposed under the `__testing` export for unit tests:
 
 ### Rendering constants
 
-| Constant            | Value  | Description                                |
-| ------------------- | ------ | ------------------------------------------ |
-| `MAX_PREVIEW_LINES` | 60     | Max lines in edit preview (split view)     |
-| `MAX_RENDER_LINES`  | 150    | Max lines in write result (unified view)   |
-| `MAX_HL_CHARS`      | 80,000 | Skip syntax highlighting above this        |
-| `CACHE_LIMIT`       | 192    | LRU cache entries for highlighted blocks   |
-| `WORD_DIFF_MIN_SIM` | 0.15   | Minimum similarity for word-level emphasis |
+| Constant                    | Value     | Description                                |
+|-----------------------------|-----------|--------------------------------------------|
+| `MAX_PREVIEW_BYTES`         | 262,144   | Maximum stored data per file preview       |
+| `MAX_PREVIEW_CHANGES`       | 64        | Maximum operations per codemode preview    |
+| `MAX_PREVIEW_DETAILS_BYTES` | 1,048,576 | Maximum stored preview data per result     |
+| `MAX_HL_CHARS`              | 80,000    | Skip syntax highlighting above this        |
+| `CACHE_LIMIT`               | 192       | LRU cache entries for highlighted blocks   |
+| `WORD_DIFF_MIN_SIM`         | 0.15      | Minimum similarity for word-level emphasis |
 
 ## Exports
 
@@ -296,18 +312,10 @@ pi-diff is a **pi extension** — a TypeScript file that exports a default funct
 
 ```typescript
 export default function piDiffExtension(pi: ExtensionAPI): void {
-  // Wrap the built-in write/edit tools with diff rendering
-  const origWrite = createWriteTool(cwd);
-  const origEdit = createEditTool(cwd);
-
-  pi.registerTool({
-    ...origWrite,
-    name: "write",
-    execute: async (...) => { /* wrap + diff */ },
-    renderCall: (...) => { /* preview */ },
-    renderResult: (...) => { /* render diff */ },
+  pi.registerToolRenderer((toolName, next) => {
+    if (toolName === "edit") return createEditRenderers();
+    return next();
   });
-
 }
 ```
 

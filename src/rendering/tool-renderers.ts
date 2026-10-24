@@ -112,6 +112,7 @@ function summaryLines(previews: ToolPreviewDetails, theme: Theme, width: number)
 		}
 	}
 	if (previews.omittedChanges) output.push(theme.fg("muted", omitted(previews.omittedChanges, "change")));
+	if (previews.incomplete) output.push(theme.fg("warning", "Preview capture incomplete"));
 	return output;
 }
 
@@ -148,6 +149,7 @@ async function expandedChanges(
 		}
 	}
 	if (previews.omittedChanges) output.push(theme.fg("muted", omitted(previews.omittedChanges, "change")));
+	if (previews.incomplete) output.push(theme.fg("warning", "Preview capture incomplete"));
 	return output.join("\n");
 }
 
@@ -158,7 +160,12 @@ function setPreviewChanges(
 	theme: Theme,
 	context: ResultRenderContext,
 ): Component {
-	const key = JSON.stringify([previews, options, themeCacheKey(theme)]);
+	const key = JSON.stringify([
+		previews,
+		options,
+		themeCacheKey(theme),
+		previews.incomplete ? theme.fg("warning", "Preview capture incomplete") : "",
+	]);
 	component.setView(
 		key,
 		(width, pending) => {

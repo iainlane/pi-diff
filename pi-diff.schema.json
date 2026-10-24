@@ -6,9 +6,9 @@
 	"type": "object",
 	"properties": {
 		"disabledTools": {
-			"description": "pi-diff tools to omit. Disabling write or edit restores Pi's built-in tool.",
+			"description": "Tools to exclude from pi-diff adapters and presentation. Native tools remain available.",
 			"type": "array",
-			"items": { "type": "string", "enum": ["write", "edit", "apply_patch"] },
+			"items": { "type": "string", "enum": ["write", "edit"] },
 			"uniqueItems": true,
 			"default": []
 		},
@@ -156,13 +156,13 @@
 			"default": 60
 		},
 		"maxPreviewLines": {
-			"description": "Maximum diff lines shown in edit-tool preview.",
+			"description": "Not read. Expanded views show all captured changed hunks within the preview storage limits.",
 			"type": "integer",
 			"minimum": 10,
 			"default": 60
 		},
 		"maxRenderLines": {
-			"description": "Maximum diff lines shown in write-tool output.",
+			"description": "Not read. Expanded views show all captured changed hunks within the preview storage limits.",
 			"type": "integer",
 			"minimum": 10,
 			"default": 150

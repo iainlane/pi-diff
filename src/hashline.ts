@@ -6,8 +6,7 @@
  * Collisions:  resolved with `:R{n}` suffix (perfect hashing per file).
  * Canonical:   CR stripped, trailing whitespace stripped before hashing.
  *
- * Design: edit-pro style (strict, no fuzzy fallback). The conservative
- * `replaceForPatch` path remains available for apply_patch mutations.
+ * Design: edit-pro style (strict, no fuzzy fallback).
  */
 
 import xxhashWasm from "xxhash-wasm";

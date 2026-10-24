@@ -21,7 +21,7 @@ import { join } from "node:path";
 // Types
 // ---------------------------------------------------------------------------
 
-export const PI_DIFF_TOOL_NAMES = ["write", "edit", "apply_patch"] as const;
+export const PI_DIFF_TOOL_NAMES = ["write", "edit"] as const;
 export type PiDiffToolName = (typeof PI_DIFF_TOOL_NAMES)[number];
 
 /**
@@ -29,7 +29,7 @@ export type PiDiffToolName = (typeof PI_DIFF_TOOL_NAMES)[number];
  * All fields are optional — missing fields fall through to env → defaults.
  */
 export interface PiDiffJson {
-	/** pi-diff tools to omit. Disabling write or edit restores Pi's built-in tool. */
+	/** Tools to exclude from pi-diff adapters and presentation. Native tools remain available. */
 	disabledTools?: PiDiffToolName[];
 	/** Hunk separator style. */
 	sepStyle?: "auto" | "simple" | "gap" | "context" | "metadata";

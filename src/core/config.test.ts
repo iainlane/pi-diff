@@ -34,7 +34,7 @@ describe("loadPiDiffConfig", () => {
 		const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
 		process.env.HOME = tmpDir;
 		mkdirSync(join(tmpDir, ".pi", "agent"), { recursive: true });
-		writeFileSync(join(tmpDir, ".pi", "agent", "pi-diff.json"), JSON.stringify({ disabledTools: ["apply_patch"] }));
+		writeFileSync(join(tmpDir, ".pi", "agent", "pi-diff.json"), JSON.stringify({ disabledTools: ["write"] }));
 		writeFileSync(join(tmpDir, "pi-diff.json"), JSON.stringify({ disabledTools: ["edit"] }));
 
 		try {
@@ -81,7 +81,7 @@ describe("loadPiDiffConfig", () => {
 		writeFileSync(configPath, JSON.stringify({ disabledTools: ["apply_patch", "bash", "edit"] }), "utf-8");
 
 		const config = loadPiDiffConfig(tmpDir) as { disabledTools?: string[] };
-		expect(config.disabledTools).toEqual(["apply_patch", "edit"]);
+		expect(config.disabledTools).toEqual(["edit"]);
 	});
 
 	it("reads color overrides from config", () => {
