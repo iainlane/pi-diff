@@ -32,17 +32,9 @@ export default function diffRendererExtension(pi: ExtensionAPI): void {
 
 	const cwd = process.cwd();
 	const disabledTools = new Set(loadPiDiffConfig().disabledTools ?? []);
-	if (!disabledTools.has("write")) pi.registerTool(createNativeWriteTool(cwd));
-	if (!disabledTools.has("edit")) pi.registerTool(createNativeEditTool(cwd));
+	if (!disabledTools.has("write")) pi.registerTool({ ...createNativeWriteTool(cwd), ...createToolRenderers("write") });
+	if (!disabledTools.has("edit")) pi.registerTool({ ...createNativeEditTool(cwd), ...createToolRenderers("edit") });
 
 	registerCodemodePreviews(pi, { disabledTools: [...disabledTools] });
 	pi.registerToolRenderer(createCodemodeRendererResolver());
-
-	const write = createToolRenderers("write");
-	const edit = createToolRenderers("edit");
-	pi.registerToolRenderer((name, next) => {
-		if (name === "write" && !disabledTools.has("write")) return write;
-		if (name === "edit" && !disabledTools.has("edit")) return edit;
-		return next();
-	});
 }
