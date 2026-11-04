@@ -1,6 +1,7 @@
 import {
 	createCodemodeExtension,
 	type ExtensionAPI,
+	initTheme,
 	type Theme,
 	type ToolRenderers,
 } from "@earendil-works/pi-coding-agent";
@@ -151,6 +152,7 @@ describe("composed codemode renderer", () => {
 	});
 
 	it("composes the SDK's native codemode renderer with full call summaries, output, and errors", async () => {
+		initTheme("dark", false);
 		const registered: ToolRenderers[] = [];
 		await createCodemodeExtension()({
 			registerTool: (tool: ToolRenderers) => registered.push(tool),
