@@ -231,7 +231,7 @@ export function createToolRenderers(name: "edit" | "write"): ToolRenderers {
 		renderCall(args, theme, context) {
 			const component = componentFor(callSlots, context);
 			const path = isRecord(args) && typeof args.path === "string" ? args.path : "";
-			const title = `${theme.fg("toolTitle", theme.bold(formatToolHeaderName(name)))} ${formatToolHeaderPath(theme, path)}`;
+			const title = `${theme.fg("toolTitle", theme.bold(context.callLabel ?? formatToolHeaderName(name)))} ${formatToolHeaderPath(theme, path)}`;
 			component.setView(
 				JSON.stringify([title, themeCacheKey(theme)]),
 				(width) => fitLine(title, width),
