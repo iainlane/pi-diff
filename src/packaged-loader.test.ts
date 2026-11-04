@@ -35,6 +35,7 @@ it("loads the packed Pi entry with the host mutation queue across separate SDK i
 		await mkdir(hostSdk);
 		await cp(join(localSdk, "dist"), join(hostSdk, "dist"), { recursive: true });
 		await cp(join(localSdk, "package.json"), join(hostSdk, "package.json"));
+		execFileSync("chmod", ["-R", "u+w", hostSdk]);
 		await symlink(join(localSdk, "node_modules"), join(hostSdk, "node_modules"), "dir");
 		await symlink(join(root, "node_modules"), join(fixture, "node_modules"), "dir");
 		const packagePath = join(fixture, "package");
