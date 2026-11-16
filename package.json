@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@shikijs/cli": "^4.0.2",
-		"diff": "^7.0.0",
+		"diff": "^8.0.4",
 		"xxhash-wasm": "^1.1.0"
 	},
 	"peerDependencies": {
@@ -55,7 +55,6 @@
 		"@earendil-works/pi-ai": "1.5.2",
 		"@earendil-works/pi-coding-agent": "1.5.2",
 		"@earendil-works/pi-tui": "1.5.2",
-		"@types/diff": "^7.0.2",
 		"@types/node": "^24.13.3",
 		"typescript": "^5.0.0",
 		"vitest": "^4.0.18"
